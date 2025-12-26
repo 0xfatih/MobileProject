@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Incident, IncidentStatus } from '../types';
-
+//kütüphane eklenecek.
 interface IncidentContextType {
     incidents: Incident[];
     addIncident: (incident: Omit<Incident, 'id' | 'createdAt' | 'status' | 'votes'>) => void;
