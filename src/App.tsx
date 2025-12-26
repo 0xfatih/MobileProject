@@ -18,7 +18,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-
+/* tekrar kontrol edicem */
 const App: React.FC = () => {
   return (
     <Routes>
