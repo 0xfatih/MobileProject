@@ -1,0 +1,1809 @@
+
+================================================================================
+
+FILE: src\components\BottomNav.tsx
+================================================================================
+
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Home, Map, PlusCircle, User, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+const BottomNav: React.FC = () => {
+    const { pathname } = useLocation();
+    const { user } = useAuth();
+
+    const isActive = (path: string) => pathname === path ? 'text-primary-600' : 'text-neutral-500';
+
+    return (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 h-16 z-50 px-6 flex items-center justify-between">
+            <Link to="/" className={`flex flex-col items-center gap-1 ${isActive('/')}`}>
+                <Home className="w-6 h-6" />
+                <span className="text-[10px] font-medium">Home</span>
+            </Link>
+
+            <Link to="/map" className={`flex flex-col items-center gap-1 ${isActive('/map')}`}>
+                <Map className="w-6 h-6" />
+                <span className="text-[10px] font-medium">Map</span>
+            </Link>
+
+            <Link to="/create" className="flex flex-col items-center -mt-6">
+                <div className="w-12 h-12 bg-primary-600 rounded-full shadow-lg flex items-center justify-center text-white">
+                    <PlusCircle className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] font-medium text-primary-600 mt-1">Report</span>
+            </Link>
+
+            {user?.role === 'ADMIN' ? (
+                <Link to="/admin" className={`flex flex-col items-center gap-1 ${isActive('/admin')}`}>
+                    <LayoutDashboard className="w-6 h-6" />
+                    <span className="text-[10px] font-medium">Admin</span>
+                </Link>
+            ) : (
+                <div className="w-6" /> // Spacer for alignment if not admin
+            )}
+
+            <Link to="/profile" className={`flex flex-col items-center gap-1 ${isActive('/profile')}`}>
+                <User className="w-6 h-6" />
+                <span className="text-[10px] font-medium">Profile</span>
+            </Link>
+        </div>
+    );
+};
+
+export default BottomNav;
+
+================================================================================
+
+FILE: src\components\Button.tsx
+================================================================================
+
+import React from 'react';
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    variant?: 'primary' | 'outline' | 'danger' | 'ghost';
+    size?: 'sm' | 'md' | 'lg';
+    fullWidth?: boolean;
+}
+
+const Button: React.FC<ButtonProps> = ({
+    children,
+    variant = 'primary',
+    size = 'md',
+    fullWidth = false,
+    className = '',
+    ...props
+}) => {
+    const baseClass = 'btn';
+    const variantClass = variant === 'ghost' ? 'btn-ghost' : `btn-${variant}`;
+    const sizeClass = size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-lg p-4' : '';
+    const widthClass = fullWidth ? 'w-full' : '';
+
+    return (
+        <button
+            className={`${baseClass} ${variantClass} ${sizeClass} ${widthClass} ${className}`}
+            {...props}
+        >
+            {children}
+        </button>
+    );
+};
+
+export default Button;
+
+================================================================================
+
+FILE: src\components\ErrorBoundary.tsx
+================================================================================
+
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+
+interface Props {
+    children: ReactNode;
+}
+
+interface State {
+    hasError: boolean;
+    error: Error | null;
+    errorInfo: ErrorInfo | null;
+}
+
+class ErrorBoundary extends Component<Props, State> {
+    public state: State = {
+        hasError: false,
+        error: null,
+        errorInfo: null
+    };
+
+    public static getDerivedStateFromError(error: Error): State {
+        return { hasError: true, error, errorInfo: null };
+    }
+
+    public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+        console.error("Uncaught error:", error, errorInfo);
+        this.setState({ error, errorInfo });
+    }
+
+    public render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ padding: '20px', fontFamily: 'sans-serif', color: '#333' }}>
+                    <h1>Something went wrong.</h1>
+                    <details style={{ whiteSpace: 'pre-wrap', marginTop: '10px', color: 'red' }}>
+                        {this.state.error && this.state.error.toString()}
+                        <br />
+                        {this.state.errorInfo && this.state.errorInfo.componentStack}
+                    </details>
+                </div>
+            );
+        }
+
+        return this.props.children;
+    }
+}
+
+export default ErrorBoundary;
+
+================================================================================
+
+FILE: src\components\IncidentCard.tsx
+================================================================================
+
+import React from 'react';
+import type { Incident } from '../types';
+import { MapPin, Clock, ThumbsUp } from 'lucide-react';
+import { timeAgo } from '../utils/dateUtils';
+
+interface IncidentCardProps {
+    incident: Incident;
+    onClick?: () => void;
+}
+
+const statusColors = {
+    OPEN: 'bg-red-100 text-red-700',
+    IN_PROGRESS: 'bg-yellow-100 text-yellow-700',
+    RESOLVED: 'bg-green-100 text-green-700',
+};
+
+const typeIcons = {
+    HEALTH: '🚑',
+    SECURITY: '👮',
+    ENVIRONMENT: '🌳',
+    LOST_FOUND: '🔍',
+    TECHNICAL: '🔧',
+};
+
+const IncidentCard: React.FC<IncidentCardProps> = ({ incident, onClick }) => {
+    return (
+        <div
+            className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            onClick={onClick}
+        >
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-2xl">{typeIcons[incident.type]}</span>
+                    <div>
+                        <h3 className="font-semibold text-neutral-900 line-clamp-1">{incident.title}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColors[incident.status]}`}>
+                            {incident.status.replace('_', ' ')}
+                        </span>
+                    </div>
+                </div>
+                <span className="text-xs text-neutral-400 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {timeAgo(incident.createdAt)}
+                </span>
+            </div>
+
+            <p className="text-sm text-neutral-600 mb-4 line-clamp-2">
+                {incident.description}
+            </p>
+
+            <div className="flex items-center justify-between text-xs text-neutral-500">
+                <div className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    <span className="truncate max-w-[150px]">{incident.location.address || 'Unknown Location'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <ThumbsUp className="w-3 h-3" />
+                    <span>{incident.votes}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default IncidentCard;
+
+================================================================================
+
+FILE: src\components\Input.tsx
+================================================================================
+
+import React from 'react';
+
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    label?: string;
+    error?: string;
+}
+
+const Input: React.FC<InputProps> = ({ label, error, className = '', ...props }) => {
+    return (
+        <div className={`flex flex-col gap-2 mb-4 ${className}`}>
+            {label && <label className="text-sm font-medium text-muted">{label}</label>}
+            <input
+                className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all border-neutral-200"
+                style={{ borderRadius: 'var(--radius-md)' }}
+                {...props}
+            />
+            {error && <span className="text-sm text-red-500">{error}</span>}
+        </div>
+    );
+};
+
+export default Input;
+
+================================================================================
+
+FILE: src\components\Navbar.tsx
+================================================================================
+
+import React from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Bell, LogOut } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const Navbar: React.FC = () => {
+    const { user, logout } = useAuth();
+
+    return (
+        <nav className="bg-white border-b border-neutral-200 h-16 sticky top-0 z-50">
+            <div className="container h-full flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Link to="/" className="text-xl font-bold text-primary-600 flex items-center gap-2">
+                        <span className="p-1.5 bg-primary-100 rounded-lg">
+                            <ShieldIcon className="w-6 h-6 text-primary-600" />
+                        </span>
+                        CampusSafe
+                    </Link>
+                </div>
+
+                <div className="hidden md:flex items-center gap-6">
+                    <Link to="/" className="text-sm font-medium hover:text-primary-600">Feed</Link>
+                    <Link to="/map" className="text-sm font-medium hover:text-primary-600">Map</Link>
+                    {user?.role === 'ADMIN' && (
+                        <Link to="/admin" className="text-sm font-medium hover:text-primary-600">Admin</Link>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <button className="p-2 text-neutral-500 hover:bg-neutral-100 rounded-full">
+                        <Bell className="w-5 h-5" />
+                    </button>
+
+                    <div className="flex items-center gap-2 pl-4 border-l border-neutral-200">
+                        <div className="hidden sm:block text-right">
+                            <p className="text-xs font-bold text-neutral-900">{user?.name}</p>
+                            <p className="text-xs text-neutral-500">{user?.role}</p>
+                        </div>
+                        <Link to="/profile" className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold">
+                            {user?.name.charAt(0).toUpperCase()}
+                        </Link>
+                        <button onClick={logout} className="p-2 text-red-500 hover:bg-red-50 rounded-full" title="Logout">
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    );
+};
+
+const ShieldIcon = ({ className }: { className?: string }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+    >
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+);
+
+export default Navbar;
+
+================================================================================
+
+FILE: src\context\AuthContext.tsx
+================================================================================
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+export type UserRole = 'USER' | 'ADMIN';
+
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    unit?: string;
+}
+
+interface AuthContextType {
+    user: User | null;
+    login: (email: string, role: UserRole) => void;
+    register: (name: string, email: string, unit: string) => void;
+    logout: () => void;
+    isLoading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        // Check local storage for persistent login
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (error) {
+                console.error('Failed to parse user data:', error);
+                localStorage.removeItem('user');
+            }
+        }
+        setIsLoading(false);
+    }, []);
+
+    const login = (email: string, role: UserRole) => {
+        // Mock login - taking email and assigning a mock user
+        const mockUser: User = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: email.split('@')[0], // Extract name from email for demo
+            email,
+            role,
+            unit: 'Engineering Faculty'
+        };
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+    };
+
+    const register = (name: string, email: string, unit: string) => {
+        // Mock register - auto login as USER
+        const newUser: User = {
+            id: Math.random().toString(36).substr(2, 9),
+            name,
+            email,
+            role: 'USER',
+            unit
+        };
+        setUser(newUser);
+        localStorage.setItem('user', JSON.stringify(newUser));
+    };
+
+    const logout = () => {
+        setUser(null);
+        localStorage.removeItem('user');
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+};
+
+================================================================================
+
+FILE: src\context\IncidentContext.tsx
+================================================================================
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { Incident, IncidentStatus } from '../types';
+
+interface IncidentContextType {
+    incidents: Incident[];
+    addIncident: (incident: Omit<Incident, 'id' | 'createdAt' | 'status' | 'votes'>) => void;
+    updateStatus: (id: string, status: IncidentStatus) => void;
+    getIncident: (id: string) => Incident | undefined;
+}
+
+const IncidentContext = createContext<IncidentContextType | undefined>(undefined);
+
+const MOCK_INCIDENTS: Incident[] = [
+    {
+        id: '1',
+        title: 'Broken Elevator in Block A',
+        description: 'The elevator in the main engineering building has been stuck on the 2nd floor since morning.',
+        type: 'TECHNICAL',
+        status: 'OPEN',
+        location: { lat: 41.0082, lng: 28.9784, address: 'Engineering Block A' },
+        createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        userId: 'u1',
+        userName: 'John Student',
+        votes: 5
+    },
+    {
+        id: '2',
+        title: 'Lost Wallet',
+        description: 'Black leather wallet lost near the cafeteria. Contains ID.',
+        type: 'LOST_FOUND',
+        status: 'OPEN',
+        location: { lat: 41.0085, lng: 28.9790, address: 'Central Cafeteria' },
+        createdAt: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        userId: 'u2',
+        userName: 'Jane Doe',
+        votes: 2
+    },
+    {
+        id: '3',
+        title: 'Slippery Stairs',
+        description: 'Stairs near the library entrance are very slippery due to rain.',
+        type: 'SECURITY',
+        status: 'RESOLVED',
+        location: { lat: 41.0090, lng: 28.9780, address: 'Library Entrance' },
+        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        userId: 'u3',
+        userName: 'Mike Guard',
+        votes: 12
+    }
+];
+
+export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [incidents, setIncidents] = useState<Incident[]>([]);
+
+    useEffect(() => {
+        const stored = localStorage.getItem('incidents');
+        if (stored) {
+            try {
+                setIncidents(JSON.parse(stored));
+            } catch (error) {
+                console.error('Failed to parse incidents data:', error);
+                localStorage.removeItem('incidents');
+                setIncidents(MOCK_INCIDENTS);
+            }
+        } else {
+            setIncidents(MOCK_INCIDENTS);
+            localStorage.setItem('incidents', JSON.stringify(MOCK_INCIDENTS));
+        }
+    }, []);
+
+    const addIncident = (data: Omit<Incident, 'id' | 'createdAt' | 'status' | 'votes'>) => {
+        const newIncident: Incident = {
+            ...data,
+            id: Math.random().toString(36).substr(2, 9),
+            createdAt: new Date().toISOString(),
+            status: 'OPEN',
+            votes: 0
+        };
+        const updated = [newIncident, ...incidents];
+        setIncidents(updated);
+        localStorage.setItem('incidents', JSON.stringify(updated));
+    };
+
+    const updateStatus = (id: string, status: IncidentStatus) => {
+        const updated = incidents.map(inc =>
+            inc.id === id ? { ...inc, status } : inc
+        );
+        setIncidents(updated);
+        localStorage.setItem('incidents', JSON.stringify(updated));
+    };
+
+    const getIncident = (id: string) => incidents.find(i => i.id === id);
+
+    return (
+        <IncidentContext.Provider value={{ incidents, addIncident, updateStatus, getIncident }}>
+            {children}
+        </IncidentContext.Provider>
+    );
+};
+
+export const useIncidents = () => {
+    const context = useContext(IncidentContext);
+    if (context === undefined) {
+        throw new Error('useIncidents must be used within an IncidentProvider');
+    }
+    return context;
+};
+
+================================================================================
+
+FILE: src\pages\AdminPanel.tsx
+================================================================================
+
+import React, { useState } from 'react';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import { useIncidents } from '../context/IncidentContext';
+import { useAuth } from '../context/AuthContext';
+import type { IncidentStatus } from '../types';
+import { Megaphone } from 'lucide-react';
+import Button from '../components/Button';
+import { timeAgo } from '../utils/dateUtils';
+
+const AdminPanel: React.FC = () => {
+    const { incidents, updateStatus } = useIncidents();
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState<'INCIDENTS' | 'ALERTS'>('INCIDENTS');
+    const [filter, setFilter] = useState<'ALL' | IncidentStatus>('ALL');
+
+    if (user?.role !== 'ADMIN') {
+        return (
+            <div className="min-h-screen bg-app p-4">
+                <h1>Access Denied. Admins Only.</h1>
+            </div>
+        );
+    }
+
+    const filteredIncidents = incidents.filter(inc =>
+        filter === 'ALL' || inc.status === filter
+    );
+
+    return (
+        <div className="min-h-screen bg-app pb-20 md:pb-0">
+            <Navbar />
+
+            <main className="container py-6">
+                <h1 className="text-2xl font-bold mb-6 text-neutral-900">Admin Dashboard</h1>
+
+                {/* Tabs */}
+                <div className="flex gap-4 border-b border-neutral-200 mb-6">
+                    <button
+                        className={`pb-2 px-1 font-medium text-sm ${activeTab === 'INCIDENTS' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-neutral-500'}`}
+                        onClick={() => setActiveTab('INCIDENTS')}
+                    >
+                        Incident Management
+                    </button>
+                    <button
+                        className={`pb-2 px-1 font-medium text-sm ${activeTab === 'ALERTS' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-neutral-500'}`}
+                        onClick={() => setActiveTab('ALERTS')}
+                    >
+                        Emergency Alerts
+                    </button>
+                </div>
+
+                {activeTab === 'INCIDENTS' && (
+                    <>
+                        {/* Filter */}
+                        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                            <button
+                                onClick={() => setFilter('ALL')}
+                                className={`px-3 py-1 rounded-full text-xs font-bold ${filter === 'ALL' ? 'bg-neutral-800 text-white' : 'bg-white border text-neutral-600'}`}
+                            >
+                                All
+                            </button>
+                            <button
+                                onClick={() => setFilter('OPEN')}
+                                className={`px-3 py-1 rounded-full text-xs font-bold ${filter === 'OPEN' ? 'bg-red-100 text-red-700' : 'bg-white border text-neutral-600'}`}
+                            >
+                                Open
+                            </button>
+                            <button
+                                onClick={() => setFilter('IN_PROGRESS')}
+                                className={`px-3 py-1 rounded-full text-xs font-bold ${filter === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700' : 'bg-white border text-neutral-600'}`}
+                            >
+                                In Progress
+                            </button>
+                            <button
+                                onClick={() => setFilter('RESOLVED')}
+                                className={`px-3 py-1 rounded-full text-xs font-bold ${filter === 'RESOLVED' ? 'bg-green-100 text-green-700' : 'bg-white border text-neutral-600'}`}
+                            >
+                                Resolved
+                            </button>
+                        </div>
+
+                        {/* List */}
+                        <div className="space-y-4">
+                            {filteredIncidents.map(incident => (
+                                <div key={incident.id} className="card flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-neutral-900">{incident.title}</span>
+                                            <span className={`text-[10px] px-2 rounded-full font-bold ${incident.status === 'OPEN' ? 'bg-red-100 text-red-700' :
+                                                incident.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                                                }`}>
+                                                {incident.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-neutral-600 mb-1">{incident.description}</p>
+                                        <div className="text-xs text-neutral-400">
+                                            Reported by {incident.userName} • {timeAgo(incident.createdAt)}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 self-end md:self-auto">
+                                        {incident.status !== 'IN_PROGRESS' && incident.status !== 'RESOLVED' && (
+                                            <Button size="sm" variant="outline" onClick={() => updateStatus(incident.id, 'IN_PROGRESS')}>
+                                                Review
+                                            </Button>
+                                        )}
+                                        {incident.status !== 'RESOLVED' && (
+                                            <Button size="sm" onClick={() => updateStatus(incident.id, 'RESOLVED')}>
+                                                Resolve
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'ALERTS' && (
+                    <div className="card p-8 text-center bg-red-50 border-red-100">
+                        <Megaphone className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold text-red-700 mb-2">Emergency Broadcast</h2>
+                        <p className="text-red-600 mb-6">Send an immediate notification to all users on campus.</p>
+                        <Button variant="danger" onClick={() => alert('Emergency Alert Sent!')}>
+                            Send Emergency Alert
+                        </Button>
+                    </div>
+                )}
+            </main>
+
+            <BottomNav />
+        </div>
+    );
+};
+
+export default AdminPanel;
+
+================================================================================
+
+FILE: src\pages\CreateIncident.tsx
+================================================================================
+
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import Input from '../components/Input';
+import Button from '../components/Button';
+import { useIncidents } from '../context/IncidentContext';
+import { useAuth } from '../context/AuthContext';
+import type { IncidentType } from '../types';
+import { Camera } from 'lucide-react';
+
+const incidentTypes: { value: IncidentType; label: string; icon: string }[] = [
+    { value: 'HEALTH', label: 'Health Emergency', icon: '🚑' },
+    { value: 'SECURITY', label: 'Security Issue', icon: '👮' },
+    { value: 'ENVIRONMENT', label: 'Environmental', icon: '🌳' },
+    { value: 'LOST_FOUND', label: 'Lost & Found', icon: '🔍' },
+    { value: 'TECHNICAL', label: 'Technical Issue', icon: '🔧' },
+];
+
+const CreateIncident: React.FC = () => {
+    const navigate = useNavigate();
+    const { addIncident } = useIncidents();
+    const { user } = useAuth();
+
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [type, setType] = useState<IncidentType>('TECHNICAL');
+    const [locationText, setLocationText] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title || !description || !locationText) return;
+
+        setIsSubmitting(true);
+
+        // Simulate API delay
+        setTimeout(() => {
+            addIncident({
+                title,
+                description,
+                type,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                location: {
+                    lat: 41.0082, // Mock coords
+                    lng: 28.9784,
+                    address: locationText
+                }
+            });
+            setIsSubmitting(false);
+            navigate('/');
+        }, 800);
+    };
+
+    return (
+        <div className="min-h-screen bg-app pb-20 md:pb-0">
+            <Navbar />
+
+            <main className="container max-w-2xl py-6">
+                <h1 className="text-2xl font-bold mb-6 text-neutral-900">Report an Incident</h1>
+
+                <div className="card">
+                    <form onSubmit={handleSubmit}>
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-muted mb-2">Category</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {incidentTypes.map((t) => (
+                                    <button
+                                        key={t.value}
+                                        type="button"
+                                        onClick={() => setType(t.value)}
+                                        className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all ${type === t.value
+                                            ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                            : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                                            }`}
+                                    >
+                                        <span className="text-2xl mb-1">{t.icon}</span>
+                                        <span className="text-xs font-medium">{t.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <Input
+                            label="Title"
+                            placeholder="e.g., Broken Light in Corridor"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            required
+                        />
+
+                        <div className="mb-4">
+                            <label className="text-sm font-medium text-muted mb-2 block">Description</label>
+                            <textarea
+                                className="w-full p-3 border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-[120px]"
+                                placeholder="Describe what happened..."
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        <Input
+                            label="Location"
+                            placeholder="e.g., Engineering Building, 2nd Floor"
+                            value={locationText}
+                            onChange={(e) => setLocationText(e.target.value)}
+                            required
+                        />
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-muted mb-2">Photo (Optional)</label>
+                            <div className="border-2 border-dashed border-neutral-300 rounded-lg p-6 flex flex-col items-center justify-center text-neutral-500 hover:bg-neutral-50 cursor-pointer transition-colors">
+                                <Camera className="w-8 h-8 mb-2" />
+                                <span className="text-sm">Tap to take a photo</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => navigate('/')}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                fullWidth
+                                className="flex-1"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Submit Report'}
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </main>
+
+            <BottomNav />
+        </div>
+    );
+};
+
+export default CreateIncident;
+
+================================================================================
+
+FILE: src\pages\Home.tsx
+================================================================================
+
+import React, { useState } from 'react';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import IncidentCard from '../components/IncidentCard';
+import { useIncidents } from '../context/IncidentContext';
+import { Search, Filter } from 'lucide-react';
+import type { IncidentType } from '../types';
+import { useNavigate } from 'react-router-dom';
+
+const Home: React.FC = () => {
+    const { incidents } = useIncidents();
+    const navigate = useNavigate();
+    const [search, setSearch] = useState('');
+    const [filterType, setFilterType] = useState<IncidentType | 'ALL'>('ALL');
+
+    const filteredIncidents = incidents.filter(inc => {
+        const matchesSearch = inc.title.toLowerCase().includes(search.toLowerCase()) ||
+            inc.description.toLowerCase().includes(search.toLowerCase());
+        const matchesType = filterType === 'ALL' || inc.type === filterType;
+        return matchesSearch && matchesType;
+    });
+
+    return (
+        <div className="min-h-screen bg-app pb-20 md:pb-0">
+            <Navbar />
+
+            <main className="container py-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <h1 className="text-2xl font-bold text-neutral-900">Incident Feed</h1>
+
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                            <input
+                                type="text"
+                                placeholder="Search incidents..."
+                                className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+
+                        <button className="p-2 border border-neutral-200 rounded-lg bg-white text-neutral-600 hover:bg-neutral-50">
+                            <Filter className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Categories / Filters Scroll */}
+                <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar">
+                    {['ALL', 'HEALTH', 'SECURITY', 'ENVIRONMENT', 'LOST_FOUND', 'TECHNICAL'].map((type) => (
+                        <button
+                            key={type}
+                            onClick={() => setFilterType(type as any)}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${filterType === type
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                                }`}
+                        >
+                            {type.replace('_', ' ')}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Feed Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredIncidents.map(incident => (
+                        <IncidentCard
+                            key={incident.id}
+                            incident={incident}
+                            onClick={() => navigate(`/incident/${incident.id}`)}
+                        />
+                    ))}
+                </div>
+
+                {filteredIncidents.length === 0 && (
+                    <div className="text-center py-12 text-neutral-500">
+                        <p>No incidents found.</p>
+                    </div>
+                )}
+            </main>
+
+            <BottomNav />
+        </div>
+    );
+};
+
+export default Home;
+
+================================================================================
+
+FILE: src\pages\IncidentDetail.tsx
+================================================================================
+
+import React from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useIncidents } from '../context/IncidentContext';
+import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import Button from '../components/Button';
+import { ArrowLeft, MapPin, Clock, Shield } from 'lucide-react';
+import { timeAgo } from '../utils/dateUtils';
+
+const IncidentDetail: React.FC = () => {
+    const { id } = useParams<{ id: string }>();
+    const { getIncident, updateStatus } = useIncidents();
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const incident = id ? getIncident(id) : undefined;
+
+    if (!incident) {
+        return (
+            <div className="min-h-screen bg-app flex flex-col">
+                <Navbar />
+                <div className="flex-1 flex flex-col items-center justify-center p-4">
+                    <p className="text-neutral-500 mb-4">Incident not found.</p>
+                    <Button onClick={() => navigate('/')}>Return Home</Button>
+                </div>
+                <BottomNav />
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-app pb-20 md:pb-0">
+            <Navbar />
+
+            <main className="container max-w-2xl py-6">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 mb-6"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                </button>
+
+                <div className="card">
+                    <div className="flex justify-between items-start mb-4">
+                        <h1 className="text-2xl font-bold text-neutral-900 mb-2">{incident.title}</h1>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
+              ${incident.status === 'OPEN' ? 'bg-red-100 text-red-700' :
+                                incident.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-green-100 text-green-700'}`}
+                        >
+                            {incident.status.replace('_', ' ')}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-sm text-neutral-500 mb-6 border-b border-neutral-100 pb-4">
+                        <span className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {timeAgo(incident.createdAt)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            {incident.location.address}
+                        </span>
+                    </div>
+
+                    <p className="text-neutral-700 leading-relaxed mb-6 whitespace-pre-wrap">
+                        {incident.description}
+                    </p>
+
+                    {/* Admin Controls */}
+                    {user?.role === 'ADMIN' && (
+                        <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-neutral-700">
+                                <Shield className="w-4 h-4" />
+                                Admin Actions
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                                <Button
+                                    size="sm"
+                                    variant={incident.status === 'OPEN' ? 'primary' : 'outline'}
+                                    onClick={() => updateStatus(incident.id, 'OPEN')}
+                                >
+                                    Mark Open
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant={incident.status === 'IN_PROGRESS' ? 'primary' : 'outline'}
+                                    onClick={() => updateStatus(incident.id, 'IN_PROGRESS')}
+                                >
+                                    Mark In Review
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant={incident.status === 'RESOLVED' ? 'primary' : 'outline'}
+                                    onClick={() => updateStatus(incident.id, 'RESOLVED')}
+                                >
+                                    Mark Resolved
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            <BottomNav />
+        </div>
+    );
+};
+
+export default IncidentDetail;
+
+================================================================================
+
+FILE: src\pages\Login.tsx
+================================================================================
+
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import Input from '../components/Input';
+
+const Login: React.FC = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const { login } = useAuth();
+    const navigate = useNavigate();
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !password) {
+            setError('Please fill in all fields');
+            return;
+        }
+
+        // Simulate role based on email or password for demo purposes
+        // admin@campus.edu -> ADMIN
+        const role = email.includes('admin') ? 'ADMIN' : 'USER';
+
+        try {
+            login(email, role);
+            navigate('/');
+        } catch (err) {
+            setError('Failed to login');
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-app p-4">
+            <div className="card w-full max-w-md">
+                <div className="text-center mb-6">
+                    <h1 className="text-2xl font-bold text-primary-600">Campus Safe</h1>
+                    <p className="text-muted">Sign in to report and track incidents</p>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <Input
+                        label="Email Address"
+                        type="email"
+                        placeholder="student@university.edu"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <Input
+                        label="Password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+
+                    {error && <div className="text-sm text-red-500 mb-4">{error}</div>}
+
+                    <div className="flex justify-end mb-4">
+                        {/* Simulated Password Reset Link */}
+                        <Link to="/forgot-password" className="text-sm text-primary-600 hover:underline">
+                            Forgot password?
+                        </Link>
+                    </div>
+
+                    <Button type="submit" fullWidth>
+                        Sign In
+                    </Button>
+
+                    <div className="mt-4 text-center text-sm">
+                        Don't have an account?{' '}
+                        <Link to="/register" className="text-primary-600 font-medium hover:underline">
+                            Create an account
+                        </Link>
+                    </div>
+                </form>
+
+                <div className="mt-6 p-3 bg-blue-50 text-blue-800 text-xs rounded-md">
+                    <p className="font-bold">Demo Credentials:</p>
+                    <p>User: user@test.com / any</p>
+                    <p>Admin: admin@test.com / any</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default Login;
+
+================================================================================
+
+FILE: src\pages\MapPage.tsx
+================================================================================
+
+// @ts-nocheck
+import React from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import { useNavigate } from 'react-router-dom';
+import { useIncidents } from '../context/IncidentContext';
+import L from 'leaflet';
+import iconMarker2x from 'leaflet/dist/images/marker-icon-2x.png';
+import iconMarker from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Fix for default Leaflet marker icons
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: iconMarker2x,
+    iconUrl: iconMarker,
+    shadowUrl: iconShadow,
+});
+
+const MapPage: React.FC = () => {
+    const { incidents } = useIncidents();
+    const navigate = useNavigate();
+
+    // Fix icon cleanup if needed (idempotent due to global mergeOptions above)
+
+    // Default center (Istanbul/Campus Mock)
+    const center: [number, number] = [41.0082, 28.9784];
+
+    return (
+        <div className="h-screen flex flex-col bg-app">
+            <Navbar />
+
+            <div className="flex-1 relative z-0">
+                {/* @ts-ignore */}
+                <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%' }}>
+                    {/* @ts-ignore */}
+                    <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    {incidents.map((incident) => (
+                        <Marker
+                            key={incident.id}
+                            position={[incident.location.lat, incident.location.lng]}
+                        >
+                            <Popup>
+                                <div onClick={() => navigate(`/incident/${incident.id}`)} className="cursor-pointer min-w-[200px]">
+                                    <h3 className="font-bold text-sm mb-1">{incident.title}</h3>
+                                    <p className="text-xs text-neutral-500 mb-2 truncate">{incident.description}</p>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${incident.status === 'OPEN' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                        }`}>
+                                        {incident.status}
+                                    </span>
+                                    <p className="text-xs text-blue-600 mt-2 font-medium">Click to view details</p>
+                                </div>
+                            </Popup>
+                        </Marker>
+                    ))}
+                </MapContainer>
+            </div>
+
+            <BottomNav />
+        </div>
+    );
+};
+
+export default MapPage;
+
+================================================================================
+
+FILE: src\pages\Profile.tsx
+================================================================================
+
+import React from 'react';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import { User, Bell, Settings, LogOut } from 'lucide-react';
+
+const Profile: React.FC = () => {
+    const { user, logout } = useAuth();
+
+    return (
+        <div className="min-h-screen bg-app pb-20 md:pb-0">
+            <Navbar />
+
+            <main className="container py-6">
+                <h1 className="text-2xl font-bold mb-6 text-neutral-900">My Profile</h1>
+
+                <div className="card mb-6">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center text-2xl font-bold text-primary-700">
+                            {user?.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-neutral-900">{user?.name}</h2>
+                            <p className="text-neutral-500">{user?.role} • {user?.unit || 'Engineering Faculty'}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 hover:bg-neutral-50 rounded-lg cursor-pointer">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center">
+                                    <User className="w-4 h-4 text-neutral-600" />
+                                </div>
+                                <span className="font-medium text-neutral-700">Account Details</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 hover:bg-neutral-50 rounded-lg cursor-pointer">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center">
+                                    <Bell className="w-4 h-4 text-neutral-600" />
+                                </div>
+                                <span className="font-medium text-neutral-700">Notifications</span>
+                            </div>
+                            <div className="w-10 h-6 bg-primary-600 rounded-full relative">
+                                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 hover:bg-neutral-50 rounded-lg cursor-pointer">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center">
+                                    <Settings className="w-4 h-4 text-neutral-600" />
+                                </div>
+                                <span className="font-medium text-neutral-700">Settings</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 pt-6 border-t border-neutral-100">
+                        <Button variant="outline" fullWidth onClick={logout} className="text-red-500 border-red-200 hover:bg-red-50">
+                            <LogOut className="w-4 h-4 mr-2" />
+                            Sign Out
+                        </Button>
+                    </div>
+                </div>
+            </main>
+
+            <BottomNav />
+        </div>
+    );
+};
+
+export default Profile;
+
+================================================================================
+
+FILE: src\pages\Register.tsx
+================================================================================
+
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import Input from '../components/Input';
+
+const Register: React.FC = () => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [unit, setUnit] = useState('');
+    const [password, setPassword] = useState('');
+    const { register } = useAuth();
+    const navigate = useNavigate();
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name || !email || !password || !unit) {
+            setError('Please fill in all fields');
+            return;
+        }
+
+        try {
+            register(name, email, unit);
+            navigate('/');
+        } catch (err) {
+            setError('Failed to register');
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-app p-4">
+            <div className="card w-full max-w-md">
+                <div className="text-center mb-6">
+                    <h1 className="text-2xl font-bold text-primary-600">Join Campus Safe</h1>
+                    <p className="text-muted">Create an account to contribute to campus safety</p>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <Input
+                        label="Full Name"
+                        placeholder="John Doe"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                    />
+                    <Input
+                        label="Email Address"
+                        type="email"
+                        placeholder="student@university.edu"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <Input
+                        label="Department / Unit"
+                        placeholder="Engineering Faculty"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                    />
+                    <Input
+                        label="Password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+
+                    {error && <div className="text-sm text-red-500 mb-4">{error}</div>}
+
+                    <Button type="submit" fullWidth>
+                        Create Account
+                    </Button>
+
+                    <div className="mt-4 text-center text-sm">
+                        Already have an account?{' '}
+                        <Link to="/login" className="text-primary-600 font-medium hover:underline">
+                            Sign In
+                        </Link>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default Register;
+
+================================================================================
+
+FILE: src\types\index.ts
+================================================================================
+
+export type UserRole = 'USER' | 'ADMIN';
+
+export type IncidentStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+
+export type IncidentType = 'HEALTH' | 'SECURITY' | 'ENVIRONMENT' | 'LOST_FOUND' | 'TECHNICAL';
+
+export interface Location {
+    lat: number;
+    lng: number;
+    address?: string;
+}
+
+export interface Incident {
+    id: string;
+    title: string;
+    description: string;
+    type: IncidentType;
+    status: IncidentStatus;
+    location: Location;
+    createdAt: string; // ISO Date string
+    userId: string;
+    userName: string;
+    imageUrl?: string;
+    votes: number;
+}
+
+================================================================================
+
+FILE: src\utils\dateUtils.ts
+================================================================================
+
+export function timeAgo(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return 'just now';
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`;
+
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`;
+
+    const years = Math.floor(days / 365);
+    return `${years} year${years > 1 ? 's' : ''} ago`;
+}
+
+================================================================================
+
+FILE: src\App.css
+================================================================================
+
+/* App specific styles can go here */
+.page-transition {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+================================================================================
+
+FILE: src\App.tsx
+================================================================================
+
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Home from './pages/Home';
+import { useAuth } from './context/AuthContext';
+import CreateIncident from './pages/CreateIncident';
+import IncidentDetail from './pages/IncidentDetail';
+import MapPage from './pages/MapPage';
+
+import AdminPanel from './pages/AdminPanel';
+import Profile from './pages/Profile';
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div>Loading...</div>;
+  if (!user) return <Navigate to="/login" />;
+  return <>{children}</>;
+};
+
+
+const App: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<div className="p-4 text-center"><h1>Password Reset Link Sent!</h1><p>Check your email (Simulation).</p></div>} />
+
+      {/* Protected Routes */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Home />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/create" element={
+        <ProtectedRoute>
+          <CreateIncident />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/incident/:id" element={
+        <ProtectedRoute>
+          <IncidentDetail />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/map" element={
+        <ProtectedRoute>
+          <MapPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <AdminPanel />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+    </Routes>
+  );
+};
+
+export default App;
+
+================================================================================
+
+FILE: src\index.css
+================================================================================
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Brand Colors - Indigo */
+  --primary-50: #eef2ff;
+  --primary-100: #e0e7ff;
+  --primary-200: #c7d2fe;
+  --primary-300: #a5b4fc;
+  --primary-400: #818cf8;
+  --primary-500: #6366f1;
+  --primary-600: #4f46e5;
+  --primary-700: #4338ca;
+  --primary-800: #3730a3;
+  --primary-900: #312e81;
+
+  /* Neutral Colors - Slate */
+  --neutral-50: #f8fafc;
+  --neutral-100: #f1f5f9;
+  --neutral-200: #e2e8f0;
+  --neutral-300: #cbd5e1;
+  --neutral-400: #94a3b8;
+  --neutral-500: #64748b;
+  --neutral-600: #475569;
+  --neutral-700: #334155;
+  --neutral-800: #1e293b;
+  --neutral-900: #0f172a;
+
+  /* Semantic Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Application Variables */
+  --bg-app: var(--neutral-50);
+  --bg-card: #ffffff;
+  --text-main: var(--neutral-900);
+  --text-muted: var(--neutral-500);
+  --border-color: var(--neutral-200);
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  --font-sans: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* Utilities */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: var(--primary-600);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-700);
+}
+
+.btn-outline {
+  border: 1px solid var(--neutral-300);
+  background: white;
+  color: var(--text-main);
+}
+
+.btn-outline:hover {
+  background: var(--neutral-50);
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.h-screen {
+  height: 100vh;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.relative {
+  position: relative;
+}
+
+.z-0 {
+  z-index: 0;
+}
+
+/* Mobile optimization */
+@media (max-width: 640px) {
+  .container {
+    padding: 0 1rem;
+  }
+}
+
+/* Leaflet Override */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+================================================================================
+
+FILE: src\main.tsx
+================================================================================
+
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import './index.css'
+import App from './App'
+import { AuthProvider } from './context/AuthContext'
+import { IncidentProvider } from './context/IncidentContext'
+import ErrorBoundary from './components/ErrorBoundary'
+import { BrowserRouter } from 'react-router-dom'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <AuthProvider>
+        <IncidentProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </IncidentProvider>
+      </AuthProvider>
+    </ErrorBoundary>
+  </React.StrictMode>,
+)
+
+================================================================================
+
+FILE: src\vite-env.d.ts
+================================================================================
+
+/// <reference types="vite/client" />
+
+declare module 'leaflet';
