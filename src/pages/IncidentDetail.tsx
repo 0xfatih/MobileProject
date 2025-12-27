@@ -7,7 +7,7 @@ import BottomNav from '../components/BottomNav';
 import Button from '../components/Button';
 import { ArrowLeft, MapPin, Clock, Shield } from 'lucide-react';
 import { timeAgo } from '../utils/dateUtils';
-
+//kütüphaneler kontrol edilecek !
 const IncidentDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { getIncident, updateStatus } = useIncidents();
