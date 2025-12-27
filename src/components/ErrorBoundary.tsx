@@ -43,5 +43,5 @@ class ErrorBoundary extends Component<Props, State> {
         return this.props.children;
     }
 }
-
+//hata mesajı eklenecek !!
 export default ErrorBoundary;
