@@ -7,7 +7,7 @@ import type { IncidentStatus } from '../types';
 import { Megaphone } from 'lucide-react';
 import Button from '../components/Button';
 import { timeAgo } from '../utils/dateUtils';
-
+//filtreleme ekledim.
 const AdminPanel: React.FC = () => {
     const { incidents, updateStatus } = useIncidents();
     const { user } = useAuth();
